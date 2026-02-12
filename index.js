@@ -1,65 +1,68 @@
-import WebSocket from 'ws';
-import fetch from 'node-fetch';
-import express from 'express';
+import express from "express";
+import WebSocket from "ws";
+import fetch from "node-fetch";
 
-// ===== KEEP ALIVE SERVER (Railway kræver dette) =====
 const app = express();
-app.get('/', (req, res) => res.send('Listener alive'));
-app.listen(3000, () => console.log('HTTP keep-alive server started'));
+app.get("/", (req, res) => res.send("alive"));
+app.listen(3000, () => console.log("HTTP keep-alive server started"));
 
+const SUPABASE_FUNCTION_URL = process.env.SUPABASE_FUNCTION_URL;
+const API_KEY = process.env.API_KEY;
 
-// ===== KICK WEBSOCKET =====
-const ws = new WebSocket('wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.0.3&flash=false');
+// ✅ RIGTIGT chatroom id fra Kick API
+const chatroomId = 1502369;
 
-ws.on('open', () => {
-    console.log('Connected to Kick WebSocket');
+console.log("Using chatroom:", chatroomId);
 
-    ws.send(JSON.stringify({
-        event: 'pusher:subscribe',
-        data: {
-            auth: '',
-            channel: 'chatrooms.2328900.v2' // DIN chatroom id
-        }
-    }));
+const ws = new WebSocket(
+  "wss://ws-us2.pusher.com/app/3c2bd69e4b95bf976979?protocol=7&client=js&version=8.4.0&flash=false"
+);
 
-    console.log('Subscribed to Kick V2 chatroom');
+ws.on("open", () => {
+  console.log("Connected to Kick WebSocket");
+
+  ws.send(
+    JSON.stringify({
+      event: "pusher:subscribe",
+      data: {
+        channel: `chatrooms.${chatroomId}.v2`,
+      },
+    })
+  );
+
+  console.log("Subscribed to Kick V2 chatroom");
 });
 
+ws.on("message", async (data) => {
+  try {
+    const msg = JSON.parse(data.toString());
 
-ws.on('message', async (data) => {
-    try {
-        const msg = JSON.parse(data);
+    if (msg.event !== "App\\Events\\ChatMessageEvent") return;
 
-        if (msg.event === 'App\\Events\\ChatMessageEvent') {
-            const messageData = JSON.parse(msg.data);
-            const username = messageData.sender.username;
-            const text = messageData.content;
+    const payload = JSON.parse(msg.data);
+    const username = payload.sender.username;
+    const message = payload.content;
 
-            console.log(`[CHAT] ${username}: ${text}`);
+    console.log(`[CHAT] ${username}: ${message}`);
 
-            // SEND WATCHTIME + XP TIL SUPABASE EDGE FUNCTION
-            await fetch(process.env.SUPABASE_FUNCTION_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': process.env.API_KEY
-                },
-                body: JSON.stringify({
-                    username: username,
-                    seconds: 60
-                })
-            });
-
-            console.log('XP + watchtime sent to Supabase Edge Function');
-        }
-
-    } catch (err) {
-        console.error('Parse error', err);
-    }
+    // 🔥 SEND TIL SUPABASE EDGE FUNCTION
+    await fetch(SUPABASE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY,
+      },
+      body: JSON.stringify({
+        username: username,
+        message: message,
+      }),
+    });
+  } catch (err) {
+    console.log("Parse error", err);
+  }
 });
 
-
-// ===== FAILSAFE LOG =====
+// keep alive log
 setInterval(() => {
-    console.log('Listener alive...');
+  console.log("Listener alive...");
 }, 30000);
