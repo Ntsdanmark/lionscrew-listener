@@ -1,63 +1,54 @@
-import express from "express";
 import WebSocket from "ws";
 import fetch from "node-fetch";
 
-const app = express();
-app.get("/", (req, res) => res.send("alive"));
-app.listen(3000, () => console.log("HTTP keep-alive server started"));
-
-const CHATROOM_ID = "1502369"; // LandalGGWP chatroom
-const SUPABASE_FUNCTION_URL = process.env.SUPABASE_FUNCTION_URL;
+const CHATROOM_ID = 1502369; // Landal chatroom
+const FUNCTION_URL = process.env.SUPABASE_FUNCTION_URL;
 const API_KEY = process.env.API_KEY;
 
-const ws = new WebSocket(
-  "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false"
-);
+console.log("Using chatroom:", CHATROOM_ID);
+
+const ws = new WebSocket("wss://ws-us.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.0.3&flash=false");
 
 ws.on("open", () => {
   console.log("Connected to Kick WebSocket");
 
   ws.send(JSON.stringify({
     event: "pusher:subscribe",
-    data: {
-      channel: `chatrooms.${CHATROOM_ID}.v2`
-    }
+    data: { channel: `chatrooms.${CHATROOM_ID}.v2` }
   }));
-
-  console.log(`Subscribed to chatrooms.${CHATROOM_ID}.v2`);
 });
 
-ws.on("message", async (raw) => {
+ws.on("message", async (msg) => {
   try {
-    const msg = JSON.parse(raw.toString());
+    const parsed = JSON.parse(msg.toString());
 
-    if (msg.event !== "App\\Events\\ChatMessageEvent") return;
+    if (parsed.event !== "App\\Events\\ChatMessageEvent") return;
 
-    const data = JSON.parse(msg.data);
+    const data = JSON.parse(parsed.data);
 
     const username = data.sender.username;
-    const content = data.content;
+    const message = data.content;
 
-    console.log(`[CHAT] ${username}: ${content}`);
+    console.log(`[CHAT] ${username}: ${message}`);
 
-    // Send watchtime + xp to Supabase Edge Function
-    await fetch(SUPABASE_FUNCTION_URL, {
+    // Send watchtime update to Supabase Edge Function
+    await fetch(FUNCTION_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": API_KEY
+        "x-api-key": API_KEY,
       },
       body: JSON.stringify({
         username: username,
-        message: content
+        seconds: 15
       })
     });
 
   } catch (err) {
-    console.log("Parse error", err);
+    console.log("Parse error:", err.message);
   }
 });
 
 setInterval(() => {
   console.log("Listener alive...");
-}, 20000);
+}, 30000);
