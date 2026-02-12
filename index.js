@@ -4,7 +4,6 @@ import fetch from "node-fetch";
 const apiEndpoint = "https://sodicmskjlevndktzrht.supabase.co/functions/v1/update-watchtime";
 const apiKey = process.env.API_KEY;
 
-// DEN RIGTIGE CHANNEL
 const CHANNEL = "chatrooms.1502369.v2";
 
 const ws = new WebSocket(
@@ -33,7 +32,6 @@ ws.on("message", async (raw) => {
 
     const data = JSON.parse(msg.data);
 
-    // V2 STRUCTURE
     const username = data.sender?.username;
     const message = data.content;
 
@@ -58,3 +56,6 @@ ws.on("message", async (raw) => {
     console.error("Error:", err);
   }
 });
+
+// 🚨 HOLDER RAILWAY I LIVE
+setInterval(() => {}, 1000);
