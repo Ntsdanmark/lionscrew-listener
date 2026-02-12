@@ -1,14 +1,25 @@
 import WebSocket from "ws";
 import fetch from "node-fetch";
 
-const channel = process.env.KICK_CHANNEL;
-const apiEndpoint = process.env.API_ENDPOINT;
+const apiEndpoint = "https://sodicmskjlevndktzrht.supabase.co/functions/v1/update-watchtime";
 const apiKey = process.env.API_KEY;
 
-const ws = new WebSocket(`wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.0.3&flash=false`);
+const channelName = "chatrooms.landalggwp.v2";
+
+const ws = new WebSocket(
+  "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.0.3&flash=false"
+);
 
 ws.on("open", () => {
   console.log("Connected to Kick WebSocket");
+
+  // 🔥 SUBSCRIBE TO YOUR CHAT
+  ws.send(JSON.stringify({
+    event: "pusher:subscribe",
+    data: {
+      channel: channelName
+    }
+  }));
 });
 
 ws.on("message", async (data) => {
@@ -23,19 +34,21 @@ ws.on("message", async (data) => {
       const username = inner.data.sender.username;
 
       if (message.startsWith("!watchtime")) {
-        console.log(`Watchtime requested by ${username}`);
+        console.log(`Updating watchtime for ${username}`);
 
         await fetch(apiEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": apiKey
+            "x-api-key": apiKey,
           },
-          body: JSON.stringify({ username })
+          body: JSON.stringify({ username }),
         });
+
+        console.log("Watchtime + XP updated");
       }
     }
   } catch (err) {
-    console.error(err);
+    console.error("Error:", err);
   }
 });
