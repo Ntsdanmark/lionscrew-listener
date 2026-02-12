@@ -2,19 +2,12 @@ import WebSocket from "ws";
 import fetch from "node-fetch";
 import http from "http";
 
-const CHANNEL_ID = process.env.CHANNEL_ID;
-const API_URL = process.env.SUPABASE_FUNCTION_URL;
-const API_KEY = process.env.SUPABASE_API_KEY;
+const apiEndpoint = process.env.API_ENDPOINT;
+const apiKey = process.env.API_KEY;
 
-// Keep-alive HTTP server (Railway må ikke lukke container)
-http
-  .createServer((req, res) => {
-    res.writeHead(200);
-    res.end("Listener alive");
-  })
-  .listen(3000, () => {
-    console.log("HTTP keep-alive server started");
-  });
+// keep Railway awake
+http.createServer((req, res) => res.end("alive")).listen(3000);
+console.log("HTTP keep-alive server started");
 
 const ws = new WebSocket(
   "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false"
@@ -23,55 +16,45 @@ const ws = new WebSocket(
 ws.on("open", () => {
   console.log("Connected to Kick WebSocket");
 
-  // Subscribe til rigtige Kick V2 chatroom
-  ws.send(
-    JSON.stringify({
-      event: "pusher:subscribe",
-      data: {
-        channel: `chatrooms.${CHANNEL_ID}.v2`,
-      },
-    })
-  );
+  // IMPORTANT: subscribe to the REAL chat channel
+  ws.send(JSON.stringify({
+    event: "pusher:subscribe",
+    data: {
+      channel: "chatroom_1502369"   // <-- THIS IS THE FIX
+    }
+  }));
 
-  console.log("Subscribed to Kick V2 chatroom");
+  console.log("Subscribed to REAL Kick chatroom");
 });
 
-ws.on("message", async (raw) => {
+ws.on("message", async (data) => {
   try {
-    const msg = JSON.parse(raw.toString());
+    const msg = JSON.parse(data.toString());
 
-    if (!msg.data) return;
+    if (!msg.event) return;
 
-    const data = JSON.parse(msg.data);
+    if (msg.event === "App\\Events\\ChatMessageEvent") {
+      const payload = JSON.parse(msg.data);
 
-    // Kun chat events
-    if (data.event !== "App\\Events\\ChatMessageEvent") return;
+      const username = payload.sender.username;
+      const message = payload.message;
 
-    const username = data.data.sender.username;
-    const message = data.data.content;
+      console.log(`[CHAT] ${username}: ${message}`);
 
-    if (!username || !message) return;
+      if (message.startsWith("!watchtime")) {
+        await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey
+          },
+          body: JSON.stringify({ username })
+        });
 
-    console.log(`[CHAT] ${username}: ${message}`);
-
-    // 🔥 SEND TIL SUPABASE FOR HVER CHAT BESKED
-    await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY,
-      },
-      body: JSON.stringify({ username }),
-    });
-
-    console.log("XP + watchtime sent to Supabase");
+        console.log("XP + watchtime sent to Supabase");
+      }
+    }
   } catch (err) {
-    console.log("Parse error:", err.message);
+    console.error(err);
   }
-});
-
-// Auto reconnect hvis WS dør
-ws.on("close", () => {
-  console.log("WebSocket closed. Reconnecting in 5s...");
-  setTimeout(() => process.exit(1), 5000);
 });
