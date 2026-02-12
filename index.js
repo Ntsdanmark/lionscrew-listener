@@ -4,7 +4,6 @@ import fetch from "node-fetch";
 const apiEndpoint = "https://sodicmskjlevndktzrht.supabase.co/functions/v1/update-watchtime";
 const apiKey = process.env.API_KEY;
 
-// Rigtigt Kick chatroom ID
 const CHANNEL = "chatroom_1502369";
 
 const ws = new WebSocket(
@@ -29,7 +28,7 @@ ws.on("message", async (raw) => {
   try {
     const msg = JSON.parse(raw.toString());
 
-    if (msg.event !== "App\\Events\\ChatMessageEvent") return;
+    if (msg.channel !== CHANNEL) return;
 
     const data = JSON.parse(msg.data);
 
@@ -41,8 +40,6 @@ ws.on("message", async (raw) => {
     console.log(`[CHAT] ${username}: ${message}`);
 
     if (message.startsWith("!watchtime")) {
-      console.log(`Updating XP for ${username}`);
-
       await fetch(apiEndpoint, {
         method: "POST",
         headers: {
