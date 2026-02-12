@@ -4,7 +4,8 @@
   "type": "module",
   "main": "index.js",
   "dependencies": {
+    "express": "^4.19.2",
     "node-fetch": "^3.3.2",
-    "ws": "^8.16.0"
+    "ws": "^8.17.0"
   }
 }
