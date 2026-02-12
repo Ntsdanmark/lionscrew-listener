@@ -4,7 +4,8 @@ import fetch from "node-fetch";
 const apiEndpoint = "https://sodicmskjlevndktzrht.supabase.co/functions/v1/update-watchtime";
 const apiKey = process.env.API_KEY;
 
-const CHANNEL = "chatroom_1502369";
+// DEN RIGTIGE CHANNEL
+const CHANNEL = "chatrooms.1502369.v2";
 
 const ws = new WebSocket(
   "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false"
@@ -21,7 +22,7 @@ ws.on("open", () => {
     },
   }));
 
-  console.log("Subscribed to Kick chatroom");
+  console.log("Subscribed to Kick V2 chatroom");
 });
 
 ws.on("message", async (raw) => {
@@ -32,6 +33,7 @@ ws.on("message", async (raw) => {
 
     const data = JSON.parse(msg.data);
 
+    // V2 STRUCTURE
     const username = data.sender?.username;
     const message = data.content;
 
