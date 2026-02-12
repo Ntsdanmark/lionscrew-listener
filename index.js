@@ -1,5 +1,5 @@
-import WebSocket from "ws";
-import fetch from "node-fetch";
+const WebSocket = require("ws");
+const fetch = require("node-fetch");
 
 const apiEndpoint = "https://sodicmskjlevndktzrht.supabase.co/functions/v1/update-watchtime";
 const apiKey = process.env.API_KEY;
@@ -13,7 +13,6 @@ const ws = new WebSocket(
 ws.on("open", () => {
   console.log("Connected to Kick WebSocket");
 
-  // 🔥 SUBSCRIBE TO YOUR CHAT
   ws.send(JSON.stringify({
     event: "pusher:subscribe",
     data: {
