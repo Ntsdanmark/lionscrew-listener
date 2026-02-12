@@ -1,73 +1,87 @@
+import http from "http";
 import WebSocket from "ws";
 import fetch from "node-fetch";
 
+// ===== RAILWAY KEEP ALIVE (VIGTIG) =====
+http
+  .createServer((req, res) => {
+    res.writeHead(200);
+    res.end("LionsCrew listener running");
+  })
+  .listen(process.env.PORT || 3000);
+
+console.log("HTTP keep-alive server started");
+
+// ===== ENV =====
 const API_ENDPOINT = process.env.API_ENDPOINT;
 const API_KEY = process.env.API_KEY;
 
-// KICK PUSHER SOCKET
+// ===== CONNECT TO KICK PUSHER =====
 const ws = new WebSocket(
   "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false"
 );
 
 ws.on("open", () => {
   console.log("Connected to Kick WebSocket");
-
-  // SUBSCRIBE TO YOUR CHANNEL (V2 CHATROOM)
-  ws.send(JSON.stringify({
-    event: "pusher:subscribe",
-    data: {
-      auth: "",
-      channel: "chatrooms.1502369.v2" // <-- DIN KICK CHATROOM ID
-    }
-  }));
-
-  console.log("Subscribed to Kick V2 chatroom");
 });
 
+// ===== HANDLE MESSAGES =====
 ws.on("message", async (raw) => {
   try {
     const msg = JSON.parse(raw.toString());
 
-    // Ignore non chat events
+    // Når forbindelsen er klar → subscribe til rigtig V2 chat
+    if (msg.event === "pusher:connection_established") {
+      ws.send(
+        JSON.stringify({
+          event: "pusher:subscribe",
+          data: {
+            auth: "",
+            channel: "chatrooms.1502369.v2",
+          },
+        })
+      );
+      console.log("Subscribed to Kick V2 chatroom");
+      return;
+    }
+
     if (!msg.data) return;
 
-    const data = typeof msg.data === "string"
-      ? JSON.parse(msg.data)
-      : msg.data;
+    const inner =
+      typeof msg.data === "string" ? JSON.parse(msg.data) : msg.data;
 
-    // Only chat messages
-    if (msg.event !== "App\\Events\\ChatMessageEvent") return;
+    if (inner.event !== "App\\Events\\ChatMessageEvent") return;
 
-    const username = data.sender?.username;
-    const message = data.message;
+    const chat = inner.data;
+    const username = chat.sender?.username;
+    const message = chat.message?.toLowerCase();
 
     if (!username || !message) return;
 
     console.log(`[CHAT] ${username}: ${message}`);
 
-    // WATCHTIME COMMAND
-    if (message.toLowerCase().startsWith("!watchtime")) {
+    // Når nogen skriver !watchtime
+    if (message.startsWith("!watchtime")) {
       console.log("Sending XP + watchtime to Supabase...");
 
       await fetch(API_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": API_KEY
+          "x-api-key": API_KEY,
         },
-        body: JSON.stringify({ username })
+        body: JSON.stringify({ username }),
       });
 
       console.log("XP + watchtime sent to Supabase");
     }
-
   } catch (err) {
-    console.error("Error:", err.message);
+    console.error("ERROR:", err.message);
   }
 });
 
-// AUTO RECONNECT (VIGTIGT)
+// ===== AUTO RECONNECT =====
 ws.on("close", () => {
-  console.log("Socket closed. Reconnecting in 5s...");
-  setTimeout(() => process.exit(1), 5000);
+  console.log("Socket closed. Restarting...");
+  process.exit(1);
 });
