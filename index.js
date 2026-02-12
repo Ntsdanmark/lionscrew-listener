@@ -1,77 +1,77 @@
 import WebSocket from "ws";
+import fetch from "node-fetch";
 import http from "http";
 
-// Dummy HTTP server så Railway tror vi er en web service
-http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end("OK");
-}).listen(3000);
+const CHANNEL_ID = process.env.CHANNEL_ID;
+const API_URL = process.env.SUPABASE_FUNCTION_URL;
+const API_KEY = process.env.SUPABASE_API_KEY;
 
-console.log("HTTP keep-alive server started");
-
-const PUSHER_URL =
-  "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false";
-
-function startKickSocket() {
-  const ws = new WebSocket(PUSHER_URL);
-
-  ws.on("open", () => {
-    console.log("Connected to Kick WebSocket");
-
-    // SUBSCRIBE TIL KICK V2 CHATROOM (RET TALLET!)
-    ws.send(
-      JSON.stringify({
-        event: "pusher:subscribe",
-        data: {
-          auth: "",
-          channel: "chatrooms.1502369.v2",
-        },
-      })
-    );
-
-    console.log("Subscribed to Kick V2 chatroom");
+// Keep-alive HTTP server (Railway må ikke lukke container)
+http
+  .createServer((req, res) => {
+    res.writeHead(200);
+    res.end("Listener alive");
+  })
+  .listen(3000, () => {
+    console.log("HTTP keep-alive server started");
   });
 
-  ws.on("message", (raw) => {
-    try {
-      const msg = JSON.parse(raw.toString());
+const ws = new WebSocket(
+  "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false"
+);
 
-      // Ignorer pusher system events
-      if (!msg.event || !msg.data) return;
+ws.on("open", () => {
+  console.log("Connected to Kick WebSocket");
 
-      // Kick chat event
-      if (msg.event === "App\\Events\\ChatMessageEvent") {
-        const data = JSON.parse(msg.data);
+  // Subscribe til rigtige Kick V2 chatroom
+  ws.send(
+    JSON.stringify({
+      event: "pusher:subscribe",
+      data: {
+        channel: `chatrooms.${CHANNEL_ID}.v2`,
+      },
+    })
+  );
 
-        const username = data.sender?.username;
-        const message = data.content;
+  console.log("Subscribed to Kick V2 chatroom");
+});
 
-        if (!username || !message) return;
+ws.on("message", async (raw) => {
+  try {
+    const msg = JSON.parse(raw.toString());
 
-        console.log(`[CHAT] ${username}: ${message}`);
+    if (!msg.data) return;
 
-        // HER kan du kalde Supabase XP/watchtime funktion
-        // await giveXP(username);
-      }
-    } catch (err) {
-      console.log("Parse error:", err.message);
-    }
-  });
+    const data = JSON.parse(msg.data);
 
-  ws.on("close", () => {
-    console.log("Socket closed. Reconnecting in 5s...");
-    setTimeout(startKickSocket, 5000);
-  });
+    // Kun chat events
+    if (data.event !== "App\\Events\\ChatMessageEvent") return;
 
-  ws.on("error", (err) => {
-    console.log("WebSocket error:", err.message);
-  });
-}
+    const username = data.data.sender.username;
+    const message = data.data.content;
 
-startKickSocket();
+    if (!username || !message) return;
 
+    console.log(`[CHAT] ${username}: ${message}`);
 
-// 🚨 KRITISK FOR RAILWAY — HOLD PROCESSEN I LIVE
-setInterval(() => {
-  console.log("Listener alive...");
-}, 30000);
+    // 🔥 SEND TIL SUPABASE FOR HVER CHAT BESKED
+    await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY,
+      },
+      body: JSON.stringify({ username }),
+    });
+
+    console.log("XP + watchtime sent to Supabase");
+  } catch (err) {
+    console.log("Parse error:", err.message);
+  }
+});
+
+// Auto reconnect hvis WS dør
+ws.on("close", () => {
+  console.log("WebSocket closed. Reconnecting in 5s...");
+  setTimeout(() => process.exit(1), 5000);
+});
