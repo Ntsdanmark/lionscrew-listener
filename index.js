@@ -6,63 +6,58 @@ const app = express();
 app.get("/", (req, res) => res.send("alive"));
 app.listen(3000, () => console.log("HTTP keep-alive server started"));
 
+const CHATROOM_ID = "1502369"; // LandalGGWP chatroom
 const SUPABASE_FUNCTION_URL = process.env.SUPABASE_FUNCTION_URL;
 const API_KEY = process.env.API_KEY;
 
-// ✅ RIGTIGT chatroom id fra Kick API
-const chatroomId = 1502369;
-
-console.log("Using chatroom:", chatroomId);
-
 const ws = new WebSocket(
-  "wss://ws-us2.pusher.com/app/3c2bd69e4b95bf976979?protocol=7&client=js&version=8.4.0&flash=false"
+  "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false"
 );
 
 ws.on("open", () => {
   console.log("Connected to Kick WebSocket");
 
-  ws.send(
-    JSON.stringify({
-      event: "pusher:subscribe",
-      data: {
-        channel: `chatrooms.${chatroomId}.v2`,
-      },
-    })
-  );
+  ws.send(JSON.stringify({
+    event: "pusher:subscribe",
+    data: {
+      channel: `chatrooms.${CHATROOM_ID}.v2`
+    }
+  }));
 
-  console.log("Subscribed to Kick V2 chatroom");
+  console.log(`Subscribed to chatrooms.${CHATROOM_ID}.v2`);
 });
 
-ws.on("message", async (data) => {
+ws.on("message", async (raw) => {
   try {
-    const msg = JSON.parse(data.toString());
+    const msg = JSON.parse(raw.toString());
 
     if (msg.event !== "App\\Events\\ChatMessageEvent") return;
 
-    const payload = JSON.parse(msg.data);
-    const username = payload.sender.username;
-    const message = payload.content;
+    const data = JSON.parse(msg.data);
 
-    console.log(`[CHAT] ${username}: ${message}`);
+    const username = data.sender.username;
+    const content = data.content;
 
-    // 🔥 SEND TIL SUPABASE EDGE FUNCTION
+    console.log(`[CHAT] ${username}: ${content}`);
+
+    // Send watchtime + xp to Supabase Edge Function
     await fetch(SUPABASE_FUNCTION_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": API_KEY,
+        "x-api-key": API_KEY
       },
       body: JSON.stringify({
         username: username,
-        message: message,
-      }),
+        message: content
+      })
     });
+
   } catch (err) {
     console.log("Parse error", err);
   }
 });
 
-// keep alive log
 setInterval(() => {
   console.log("Listener alive...");
-}, 30000);
+}, 20000);
