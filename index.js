@@ -1,5 +1,5 @@
-const WebSocket = require("ws");
-const fetch = require("node-fetch");
+import WebSocket from "ws";
+import fetch from "node-fetch";
 
 const apiEndpoint = "https://sodicmskjlevndktzrht.supabase.co/functions/v1/update-watchtime";
 const apiKey = process.env.API_KEY;
@@ -16,8 +16,8 @@ ws.on("open", () => {
   ws.send(JSON.stringify({
     event: "pusher:subscribe",
     data: {
-      channel: channelName
-    }
+      channel: channelName,
+    },
   }));
 });
 
