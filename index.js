@@ -11,11 +11,18 @@ ws.on("open", () => {
 });
 
 ws.on("message", (raw) => {
-  const msg = JSON.parse(raw.toString());
+  const message = JSON.parse(raw.toString());
 
-  // ✅ MEGET VIGTIGT – handshake efter connection_established
-  if (msg.event === "pusher:connection_established") {
-    console.log("✅ Pusher handshake OK");
+  console.log("📩 RAW EVENT:", message.event);
+
+  // 🟢 Håndter ALLE pusher events
+  if (message.event && message.event.startsWith("pusher:")) {
+    console.log("⚡ Pusher event:", message.event);
+  }
+
+  // 🟢 Når forbindelse er etableret → subscribe
+  if (message.event === "pusher:connection_established") {
+    console.log("✅ Handshake complete");
 
     ws.send(JSON.stringify({
       event: "pusher:subscribe",
@@ -28,13 +35,15 @@ ws.on("message", (raw) => {
     console.log(`📡 Subscribed to chatrooms.${CHATROOM_ID}.v2`);
   }
 
-  // ✅ HER KOMMER CHATBESKEDERNE
-  if (msg.event === "App\\Events\\ChatMessageEvent") {
-    const data = JSON.parse(msg.data);
+  // 🟢 Når subscription lykkes
+  if (message.event === "pusher_internal:subscription_succeeded") {
+    console.log("🎉 Subscription succeeded");
+  }
 
-    console.log(
-      `💬 ${data.sender.username}: ${data.content}`
-    );
+  // 🟢 Chat beskeder
+  if (message.event === "App\\Events\\ChatMessageEvent") {
+    const data = JSON.parse(message.data);
+    console.log(`💬 ${data.sender.username}: ${data.content}`);
   }
 });
 
