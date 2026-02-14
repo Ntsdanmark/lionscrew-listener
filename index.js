@@ -1,47 +1,61 @@
 import WebSocket from "ws";
 
-const CHATROOM_ID = 1502369;
+const CHANNEL = "landalggwp"; // stream navn (små bogstaver)
 
-// ✅ RIGTIG KICK PUSHER (US CLUSTER)
-const ws = new WebSocket(
-  "wss://ws-us2.pusher.com/app/6e7c9d2d4f7f6e0b1e62?protocol=7&client=js&version=8.4.0&flash=false"
-);
+async function start() {
+  // 1️⃣ Hent stream info fra Kick API
+  const res = await fetch(`https://kick.com/api/v2/channels/${CHANNEL}`);
+  const json = await res.json();
 
-ws.on("open", () => {
-  console.log("🔌 Connected to Kick WebSocket (US2)");
-});
+  const chatroomId = json.chatroom.id;
+  console.log("✅ Chatroom ID:", chatroomId);
 
-ws.on("message", (raw) => {
-  const message = JSON.parse(raw.toString());
+  // 2️⃣ Hent korrekt websocket info
+  const wsRes = await fetch("https://kick.com/api/v2/pusher");
+  const wsJson = await wsRes.json();
 
-  if (message.event === "pusher:connection_established") {
-    console.log("✅ Handshake complete");
+  const { key, cluster } = wsJson;
 
-    ws.send(JSON.stringify({
-      event: "pusher:subscribe",
-      data: {
-        auth: "",
-        channel: `chatrooms.${CHATROOM_ID}.v2`,
-      },
-    }));
+  console.log("🔑 Using key:", key);
+  console.log("🌍 Cluster:", cluster);
 
-    console.log(`📡 Subscribed to chatrooms.${CHATROOM_ID}.v2`);
-  }
+  // 3️⃣ Forbind korrekt
+  const ws = new WebSocket(
+    `wss://ws-${cluster}.pusher.com/app/${key}?protocol=7&client=js&version=8.4.0&flash=false`
+  );
 
-  if (message.event === "pusher_internal:subscription_succeeded") {
-    console.log("🎉 Subscription succeeded");
-  }
+  ws.on("open", () => {
+    console.log("🔌 Connected to Kick WebSocket");
+  });
 
-  if (message.event === "App\\Events\\ChatMessageEvent") {
-    const data = JSON.parse(message.data);
-    console.log(`💬 ${data.sender.username}: ${data.content}`);
-  }
+  ws.on("message", (raw) => {
+    const msg = JSON.parse(raw.toString());
 
-  if (message.event === "pusher:error") {
-    console.log("❌ Pusher error:", message.data);
-  }
-});
+    if (msg.event === "pusher:connection_established") {
+      console.log("✅ Handshake complete");
 
-ws.on("error", (err) => {
-  console.error("WebSocket error:", err.message);
-});
+      ws.send(JSON.stringify({
+        event: "pusher:subscribe",
+        data: {
+          auth: "",
+          channel: `chatrooms.${chatroomId}.v2`,
+        },
+      }));
+    }
+
+    if (msg.event === "pusher_internal:subscription_succeeded") {
+      console.log("🎉 Subscription succeeded");
+    }
+
+    if (msg.event === "App\\Events\\ChatMessageEvent") {
+      const data = JSON.parse(msg.data);
+      console.log(`💬 ${data.sender.username}: ${data.content}`);
+    }
+  });
+
+  ws.on("error", (err) => {
+    console.error("❌ WebSocket error:", err.message);
+  });
+}
+
+start();
