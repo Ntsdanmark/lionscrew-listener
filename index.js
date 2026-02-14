@@ -1,23 +1,44 @@
-import { io } from "socket.io-client";
-
 const CHANNEL = "landalggwp";
 
-const socket = io("wss://chat.kick.com", {
-  transports: ["websocket"],
-});
+async function start() {
+  // 1️⃣ Hent channel info
+  const channelRes = await fetch(`https://kick.com/api/v2/channels/${CHANNEL}`);
+  const channelData = await channelRes.json();
 
-socket.on("connect", () => {
-  console.log("🔌 Connected to Kick chat");
+  const chatroomId = channelData.chatroom.id;
+  console.log("✅ Chatroom ID:", chatroomId);
 
-  socket.emit("subscribe", {
-    channel: CHANNEL,
-  });
-});
+  let lastMessageId = null;
 
-socket.on("chat.message", (data) => {
-  console.log(`💬 ${data.sender.username}: ${data.content}`);
-});
+  // 2️⃣ Poll chat hvert 2. sekund
+  setInterval(async () => {
+    try {
+      const res = await fetch(
+        `https://kick.com/api/v2/chatrooms/${chatroomId}/messages`
+      );
 
-socket.on("connect_error", (err) => {
-  console.log("❌ Connection error:", err.message);
-});
+      const data = await res.json();
+
+      const messages = data.data;
+
+      if (!messages.length) return;
+
+      // sorter ældste → nyeste
+      messages.reverse();
+
+      for (const msg of messages) {
+        if (msg.id === lastMessageId) continue;
+
+        lastMessageId = msg.id;
+
+        console.log(
+          `💬 ${msg.sender.username}: ${msg.content}`
+        );
+      }
+    } catch (err) {
+      console.log("❌ Fetch error:", err.message);
+    }
+  }, 2000);
+}
+
+start();
