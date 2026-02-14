@@ -2,13 +2,13 @@ import WebSocket from "ws";
 
 const CHATROOM_ID = 1502369;
 
-// ✅ OPDATERET KICK EU PUSHER KEY
+// ✅ RIGTIG KICK PUSHER (US CLUSTER)
 const ws = new WebSocket(
-  "wss://ws-eu.pusher.com/app/6e7c9d2d4f7f6e0b1e62?protocol=7&client=js&version=8.4.0&flash=false"
+  "wss://ws-us2.pusher.com/app/6e7c9d2d4f7f6e0b1e62?protocol=7&client=js&version=8.4.0&flash=false"
 );
 
 ws.on("open", () => {
-  console.log("🔌 Connected to Kick EU WebSocket");
+  console.log("🔌 Connected to Kick WebSocket (US2)");
 });
 
 ws.on("message", (raw) => {
