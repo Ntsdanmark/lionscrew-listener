@@ -2,8 +2,9 @@ import WebSocket from "ws";
 
 const CHATROOM_ID = 1502369;
 
+// ✅ OPDATERET KICK EU PUSHER KEY
 const ws = new WebSocket(
-  "wss://ws-eu.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false"
+  "wss://ws-eu.pusher.com/app/6e7c9d2d4f7f6e0b1e62?protocol=7&client=js&version=8.4.0&flash=false"
 );
 
 ws.on("open", () => {
@@ -13,14 +14,6 @@ ws.on("open", () => {
 ws.on("message", (raw) => {
   const message = JSON.parse(raw.toString());
 
-  console.log("📩 RAW EVENT:", message.event);
-
-  // 🟢 Håndter ALLE pusher events
-  if (message.event && message.event.startsWith("pusher:")) {
-    console.log("⚡ Pusher event:", message.event);
-  }
-
-  // 🟢 Når forbindelse er etableret → subscribe
   if (message.event === "pusher:connection_established") {
     console.log("✅ Handshake complete");
 
@@ -35,18 +28,20 @@ ws.on("message", (raw) => {
     console.log(`📡 Subscribed to chatrooms.${CHATROOM_ID}.v2`);
   }
 
-  // 🟢 Når subscription lykkes
   if (message.event === "pusher_internal:subscription_succeeded") {
     console.log("🎉 Subscription succeeded");
   }
 
-  // 🟢 Chat beskeder
   if (message.event === "App\\Events\\ChatMessageEvent") {
     const data = JSON.parse(message.data);
     console.log(`💬 ${data.sender.username}: ${data.content}`);
   }
+
+  if (message.event === "pusher:error") {
+    console.log("❌ Pusher error:", message.data);
+  }
 });
 
 ws.on("error", (err) => {
-  console.error("❌ WebSocket error:", err.message);
+  console.error("WebSocket error:", err.message);
 });
